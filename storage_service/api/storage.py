@@ -31,7 +31,6 @@ create_bucket(minio_client, BUCKET_NAME)
 
 async def upload_video(video: UploadFile) -> str:
     try:
-        #TODO uint поменять в ключе#
         object_key = f"{hashlib.md5(video.filename.encode()).hexdigest()}_{video.filename}"
 
         file_content = await video.read()
