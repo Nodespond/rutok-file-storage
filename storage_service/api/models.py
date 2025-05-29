@@ -13,6 +13,7 @@ class Videos(Base):
     type = Column(String)
     size = Column(Integer)
     update_date = Column(DateTime(timezone=True), default=func.now())
+    preview_url = Column(String)
 
     def __repr__(self):
         return f"<VideoMetadata(name='{self.name}', path='{self.path}')>"

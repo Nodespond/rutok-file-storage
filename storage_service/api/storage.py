@@ -3,7 +3,7 @@ from minio.error import S3Error
 from fastapi import HTTPException
 
 from fastapi import UploadFile
-import hashlib
+
 import io , os
 
 from datetime import datetime
@@ -81,19 +81,24 @@ async def upload_video(video: UploadFile , db:Session ) -> str:
         raise HTTPException(status_code=500, detail="Ошибка загрузки видео в хранилище")
 
 
-async def upload_preview(preview: UploadFile, video_id: str):
-    preview_key = f"previews_{video_id}.png"
+async def upload_preview(preview: UploadFile, video_id: int):
+    try:
+        preview_key = f"preview_{video_id}.png"
 
-    if not preview.content_type.startswith('image/'):
-        raise ValueError("Превью должно быть изображением")
+        if not preview.content_type.startswith('image/'):
+            raise ValueError("Превью должно быть изображением")
 
-    minio_client.put_object(
-        BUCKET_NAME,
-        preview_key,
-        preview.file,
-        length=-1,
-        part_size=10 * 1024 * 1024,
-        content_type=preview.content_type
-    )
+        file_content = await preview.read()
 
-    return preview_key
+        minio_client.put_object(
+            BUCKET_NAME,
+            preview_key,
+            io.BytesIO(file_content),
+            length=len(file_content),
+            content_type=preview.content_type
+        )
+
+        return preview_key
+
+    except S3Error as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка загрузки превью: {str(e)}")
