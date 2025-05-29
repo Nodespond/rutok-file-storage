@@ -38,29 +38,48 @@ async def get_file(object_key: str):
 
 @app.post("/api/files/{video_id}/preview", summary="Загрузка превью для видео", tags=["Превью"])
 async def upload_preview_for_video(
-        video_id: str,
-        preview: UploadFile = File(..., description="Превью видео")
+        video_id: int,
+        preview: UploadFile = File(..., description="Превью видео"),
+        db: Session = Depends(get_db)
 ):
     try:
+        db_video = db.query(Videos).filter(Videos.id == video_id).first()
+        if not db_video:
+            raise HTTPException(status_code=404, detail="Видео не найдено")
+
         preview_key = await upload_preview(preview, video_id)
 
+        db_video.preview_url = preview_key
+        db.commit()
+
+
         return {
-            "preview_key": preview_key,
+            "preview_url": preview_key,
             "message": "Превью успешно загружено"
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка загрузки превью: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Ошибка в загрузке превью: {str(e)}")
 
 
 @app.get("/api/files/{video_id}/preview", summary="Получение превью видео", tags=["Превью"])
-async def get_preview(video_id: str):
+async def get_preview(
+        video_id: str,
+        db: Session = Depends(get_db)
+):
     try:
-        preview_key = f"previews_{video_id}.png"
+        db_video = db.query(Videos).filter(Videos.id == video_id).first()
+        if not db_video:
+            raise HTTPException(status_code=404, detail="Видео не найдено")
 
-        response = minio_client.get_object(BUCKET_NAME, preview_key)
+        response = minio_client.get_object(BUCKET_NAME, db_video.preview_url)
         return Response(
             content=response.data,
             media_type=response.headers["Content-Type"]
         )
+
+    except S3Error as e:
+        if e.code == "NoSuchKey":
+            raise HTTPException(status_code=404, detail="Превью не найдено в хранилище")
+        raise HTTPException(status_code=500, detail=f"Ошибка хранилища: {str(e)}")
     except Exception as e:
-        raise HTTPException(status_code=404, detail=f"Превью не найдено: {str(e)}")
+        raise HTTPException(status_code=404, detail=f"Ошибка получения превью: {str(e)}")
