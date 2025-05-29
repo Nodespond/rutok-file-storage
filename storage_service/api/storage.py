@@ -1,9 +1,15 @@
 from minio import Minio
 from minio.error import S3Error
+from fastapi import HTTPException
+
 from fastapi import UploadFile
 import hashlib
-import io
-import os
+import io , os
+
+from datetime import datetime
+from sqlalchemy.orm import Session
+
+from storage_service.api.models import Videos
 
 MINIO_HOST = os.environ.get("MINIO_HOST", "localhost:9000")
 MINIO_ACCESS_KEY = os.environ.get("MINIO_ACCESS_KEY")
@@ -29,23 +35,65 @@ minio_client = Minio(
 )
 create_bucket(minio_client, BUCKET_NAME)
 
-async def upload_video(video: UploadFile) -> str:
+async def upload_video(video: UploadFile , db:Session ) -> str:
     try:
-        object_key = f"{hashlib.md5(video.filename.encode()).hexdigest()}_{video.filename}"
+
+        record = Videos(
+            name=video.filename,
+            path="",
+            type=video.content_type,
+            size=0,
+            update_date=datetime.now()
+        )
+
+        db.add(record)
+        db.commit()
+        db.refresh(record)
+
+        object_id = f"{record.id}_{video.filename}"
 
         file_content = await video.read()
-        content_type = video.content_type or "video/mp4"
-        print(f"Content-Type перед загрузкой: {content_type}")
+        size = len(file_content)
+
         minio_client.put_object(
             BUCKET_NAME,
-            object_key,
+            object_id,
             data=io.BytesIO(file_content),
-            length=len(file_content),
-            content_type=content_type,
-            metadata={"Content-Type": content_type}
+            length=size,
+            content_type=video.content_type,
+            metadata={"Content-Type": video.content_type}
         )
-        return object_key
+
+        record.path = object_id
+        record.size = size
+        db.commit()
+
+        return object_id
 
     except S3Error as exc:
-        print(f"Error uploading to MinIO: {exc}")
+        print(f"Ошибка загрузки в MinIO: {exc}")
+        if record and record.id:
+            db.delete(record)
+            db.commit()
         raise
+    except Exception as db_exc:
+        print(f"Ошибка загрузки в БД: {db_exc}")
+        raise HTTPException(status_code=500, detail="Ошибка загрузки видео в хранилище")
+
+
+async def upload_preview(preview: UploadFile, video_id: str):
+    preview_key = f"previews_{video_id}.png"
+
+    if not preview.content_type.startswith('image/'):
+        raise ValueError("Превью должно быть изображением")
+
+    minio_client.put_object(
+        BUCKET_NAME,
+        preview_key,
+        preview.file,
+        length=-1,
+        part_size=10 * 1024 * 1024,
+        content_type=preview.content_type
+    )
+
+    return preview_key

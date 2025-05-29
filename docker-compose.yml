@@ -45,3 +45,5 @@ services:
     restart: always
     volumes:
       - .:/app
+
+# не добавлены volumes для бд и хранилища
