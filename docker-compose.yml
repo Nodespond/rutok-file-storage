@@ -23,16 +23,6 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  pgadmin:
-    container_name: pgadmin
-    image: dpage/pgadmin4
-    environment:
-      PGADMIN_DEFAULT_EMAIL: noemail@noemail.com
-      PGADMIN_DEFAULT_PASSWORD: root
-    ports:
-      - 5050:80
-
-
   api:
     image: rutok-files:latest
     container_name: file-storage
