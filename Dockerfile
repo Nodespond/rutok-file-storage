@@ -8,12 +8,11 @@ RUN pip install -r requirements.txt
 RUN pip install alembic psycopg2-binary
 
 COPY . .
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+#RUN chmod +x /app/entrypoint.sh
 
-RUN apt-get update && apt-get install -y postgresql-client && rm -rf /var/lib/apt/lists/*
+#RUN apt-get update && apt-get install -y postgresql-client && rm -rf /var/lib/apt/lists/*
 
-ENTRYPOINT ["/entrypoint.sh"]
+#ENTRYPOINT ["/app/entrypoint.sh"]
 
 CMD ["uvicorn", "storage_service.main:app", "--host", "0.0.0.0", "--port", "8001"]
 

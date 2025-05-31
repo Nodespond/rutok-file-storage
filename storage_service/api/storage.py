@@ -50,7 +50,7 @@ async def upload_video(video: UploadFile , db:Session ) -> int:
         db.commit()
         db.refresh(record)
 
-        object_id = f"{record.id}_{video.filename}"
+        object_id = f"{record.id}_{video.filename}.mp4"
 
         file_content = await video.read()
         size = len(file_content)
