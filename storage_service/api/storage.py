@@ -35,7 +35,7 @@ minio_client = Minio(
 )
 create_bucket(minio_client, BUCKET_NAME)
 
-async def upload_video(video: UploadFile , db:Session ) -> str:
+async def upload_video(video: UploadFile , db:Session ) -> int:
     try:
 
         record = Videos(
@@ -68,7 +68,7 @@ async def upload_video(video: UploadFile , db:Session ) -> str:
         record.size = size
         db.commit()
 
-        return object_id
+        return record.id
 
     except S3Error as exc:
         print(f"Ошибка загрузки в MinIO: {exc}")

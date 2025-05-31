@@ -20,6 +20,8 @@ services:
       - POSTGRES_DB=rutok
     ports:
       - 5432:5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 
   pgadmin:
     container_name: pgadmin
@@ -46,4 +48,5 @@ services:
     volumes:
       - .:/app
 
-# не добавлены volumes для бд и хранилища
+volumes:
+  postgres_data:

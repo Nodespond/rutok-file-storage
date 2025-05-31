@@ -7,3 +7,4 @@ class VideoMetadata(BaseModel):
     type: str
     size: int
     update_date: datetime
+    preview_url: str
