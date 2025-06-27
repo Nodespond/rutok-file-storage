@@ -20,11 +20,9 @@ services:
       - POSTGRES_DB=rutok
     ports:
       - 5432:5432
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
 
-  api:
-    image: rutok-files:latest
+  file-storage:
+    image: rutok-file-storage
     container_name: file-storage
     ports:
       - "8001:8001"
@@ -32,11 +30,22 @@ services:
       MINIO_HOST: "minio:9000"
       MINIO_ACCESS_KEY: "rutok"
       MINIO_SECRET_KEY: "rutokminio"
+      FAST_API_PORT: "8001"
     depends_on:
       - minio
-    restart: always
     volumes:
       - .:/app
 
-volumes:
-  postgres_data:
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=rutok@rutok.com
+      - PGADMIN_DEFAULT_PASSWORD=rutokminio
+    ports:
+      - "8080:80"
+    depends_on:
+      - postgres-db
+
+

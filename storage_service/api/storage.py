@@ -11,6 +11,11 @@ from sqlalchemy.orm import Session
 
 from storage_service.api.models import Videos
 
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 MINIO_HOST = os.environ.get("MINIO_HOST", "localhost:9000")
 MINIO_ACCESS_KEY = os.environ.get("MINIO_ACCESS_KEY")
 MINIO_SECRET_KEY = os.environ.get("MINIO_SECRET_KEY")
@@ -35,7 +40,7 @@ minio_client = Minio(
 )
 create_bucket(minio_client, BUCKET_NAME)
 
-async def upload_video(video: UploadFile , db:Session ) -> int:
+async def upload_video(video: UploadFile , db:Session, userId:int ) -> int:
     try:
 
         record = Videos(
@@ -43,14 +48,15 @@ async def upload_video(video: UploadFile , db:Session ) -> int:
             path="",
             type=video.content_type,
             size=0,
-            update_date=datetime.now()
+            update_date=datetime.now(),
+            user_id=userId
         )
 
         db.add(record)
         db.commit()
         db.refresh(record)
 
-        object_id = f"{record.id}_{video.filename}.mp4"
+        object_id = f"{record.id}"
 
         file_content = await video.read()
         size = len(file_content)
@@ -81,9 +87,9 @@ async def upload_video(video: UploadFile , db:Session ) -> int:
         raise HTTPException(status_code=500, detail="Ошибка загрузки видео в хранилище")
 
 
-async def upload_preview(preview: UploadFile, video_id: int):
+async def upload_preview(preview: UploadFile, videoId: int):
     try:
-        preview_key = f"preview_{video_id}.png"
+        preview_key = f"preview_{videoId}.png"
 
         if not preview.content_type.startswith('image/'):
             raise ValueError("Превью должно быть изображением")
@@ -102,3 +108,19 @@ async def upload_preview(preview: UploadFile, video_id: int):
 
     except S3Error as e:
         raise HTTPException(status_code=500, detail=f"Ошибка загрузки превью: {str(e)}")
+
+async def get_video_path(db: Session, video_id: int, user_id: int):
+    db_video = db.query(Videos).filter(Videos.id == video_id, Videos.user_id == user_id).first()
+    if not db_video:
+        return None
+    return db_video.path
+
+async def get_video_preview(db: Session, video_id: int, user_id: int):
+    try:
+        db_video = db.query(Videos).filter(Videos.id == video_id, Videos.user_id == user_id).first()
+        if not db_video:
+            return None
+        return db_video.preview_url
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка при запросе к базе данных: {str(e)}")

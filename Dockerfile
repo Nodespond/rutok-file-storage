@@ -2,19 +2,16 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+ENV PYTHONPATH="/app"
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip
 RUN pip install -r requirements.txt
 RUN pip install alembic psycopg2-binary
 
 COPY . .
-#RUN chmod +x /app/entrypoint.sh
 
-#RUN apt-get update && apt-get install -y postgresql-client && rm -rf /var/lib/apt/lists/*
-
-#ENTRYPOINT ["/app/entrypoint.sh"]
-
-CMD ["uvicorn", "storage_service.main:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD ["python", "storage_service/main.py"]
 
 
 

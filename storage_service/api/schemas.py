@@ -6,5 +6,6 @@ class VideoMetadata(BaseModel):
     path: str
     type: str
     size: int
-    update_date: datetime
-    preview_url: str
+    updateDate: datetime
+    previewUrl: str
+    userId: int
