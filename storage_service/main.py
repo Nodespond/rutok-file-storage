@@ -7,6 +7,7 @@ from fastapi import File
 from fastapi.params import Depends , Header
 import jwt
 from jwt.exceptions import PyJWTError
+from starlette.responses import StreamingResponse
 
 from storage_service.api.database import get_db
 from storage_service.api.storage import *
@@ -27,7 +28,7 @@ SQIDAQAB\n-----END PUBLIC KEY-----\n
 async def get_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
 
-        token = credentials.credentials[7:]
+        token = credentials.credentials
         print(token)
         payload = jwt.decode(token, PUBLIC_KEY, algorithms=["RS256"])
         userId = payload.get("sub") or payload.get("user_id")
@@ -56,8 +57,7 @@ async def upload(
         db.commit()
 
         return {
-            "videoId": video_id,
-            "message": "Видео загружено, данные сохранены"
+            "videoId": video_id
         }
     except HTTPException:
         raise
@@ -65,34 +65,37 @@ async def upload(
         raise HTTPException(status_code=500, detail=f"Ошибка загрузки видео и превью: {str(e)}")
 
 
-@app.get("/api/files/{videoId}",summary="Получение из хранилища",tags=["Видео"])
+@app.get("/api/files/{videoId}", summary="Получение ссылки на видео из хранилища", tags=["Видео"])
 async def get_file(
-        videoId: int ,
+        videoId: int,
         db: Session = Depends(get_db),
         userId: int = Depends(get_user)
 ):
     try:
-        videoPath = await get_video_path(db, videoId, userId)
-        if not videoPath:
-            raise HTTPException(status_code=404, detail="Нет указания на имя видео в S3 !")
-        return {"videoPath": videoPath}
-
+        db_video = await get_video_db(db, videoId, userId)
+        url = generate_presigned_url(db_video.path)
+        return {"urlVideo": url}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=404, detail=f"Ошибка получения пути к видео: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Ошибка при получении ссылки на видео: {str(e)}")
 
-@app.get("/api/files/preview/{videoId}", summary="Получение превью видео", tags=["Превью"])
+@app.get("/api/files/preview/{videoId}", summary="Получение ссылки на превью из хранилища", tags=["Превью"])
 async def get_preview(
         videoId: int,
         db: Session = Depends(get_db),
         userId: int = Depends(get_user)
 ):
     try:
-        dbVideoPreview = await get_video_preview(db, videoId, userId)
-        if not dbVideoPreview:
-            raise HTTPException(status_code=404, detail="Не найден путь к превью видео в S3")
-        return {"previewPath": dbVideoPreview}
+        db_video = await get_video_db(db, videoId, userId)
+        if not db_video.preview_url:
+            raise HTTPException(status_code=404, detail="Превью не найдено")
+        url = generate_presigned_url(db_video.preview_url)
+        return {"urlPreview": url}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка получения пути к превью: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Ошибка при получении ссылки на превью: {str(e)}")
 
 if __name__ == "__main__":
     FAST_API_PORT = os.getenv("FAST_API_PORT", "8001")
@@ -102,3 +105,4 @@ if __name__ == "__main__":
         sys.exit(1)
     else:
         uvicorn.run("storage_service.main:app", host="0.0.0.0",port=port)
+

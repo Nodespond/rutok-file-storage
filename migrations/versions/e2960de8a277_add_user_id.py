@@ -20,8 +20,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    op.add_column('videos',sa.Column('user_id', sa.Integer(), nullable=False))
+    op.add_column('videos',sa.Column('user_id', sa.Integer(), nullable=False), schema='file_storage')
 
 
 def downgrade() -> None:
-    op.drop_column('videos', 'user_id')
+    op.drop_column('videos', 'user_id', schema='file_storage')

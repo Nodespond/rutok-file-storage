@@ -1,12 +1,12 @@
 from minio import Minio
 from minio.error import S3Error
 from fastapi import HTTPException
-
+from typing import BinaryIO
 from fastapi import UploadFile
-
+import jwt
 import io , os
 
-from datetime import datetime
+from datetime import datetime,timezone, timedelta
 from sqlalchemy.orm import Session
 
 from storage_service.api.models import Videos
@@ -20,7 +20,6 @@ MINIO_HOST = os.environ.get("MINIO_HOST", "localhost:9000")
 MINIO_ACCESS_KEY = os.environ.get("MINIO_ACCESS_KEY")
 MINIO_SECRET_KEY = os.environ.get("MINIO_SECRET_KEY")
 BUCKET_NAME = os.environ.get("BUCKET_NAME", "videos")
-
 
 def create_bucket(minio_client, bucket_name):
     try:
@@ -39,6 +38,19 @@ minio_client = Minio(
     secure=False
 )
 create_bucket(minio_client, BUCKET_NAME)
+
+def generate_presigned_url(object_name: str, expires: timedelta = timedelta(days=7)) -> str:
+    try:
+        url = minio_client.get_presigned_url(
+            "GET",
+            BUCKET_NAME,
+            object_name,
+            expires=expires
+        )
+        return url
+    except S3Error as exc:
+        logger.error(f"Ошибка генерации pre-signed URL: {exc}")
+        raise HTTPException(status_code=500, detail=f"Ошибка генерации ссылки: {str(exc)}")
 
 async def upload_video(video: UploadFile , db:Session, userId:int ) -> int:
     try:
@@ -109,18 +121,10 @@ async def upload_preview(preview: UploadFile, videoId: int):
     except S3Error as e:
         raise HTTPException(status_code=500, detail=f"Ошибка загрузки превью: {str(e)}")
 
-async def get_video_path(db: Session, video_id: int, user_id: int):
+async def get_video_db(db: Session, video_id: int, user_id: int):
     db_video = db.query(Videos).filter(Videos.id == video_id, Videos.user_id == user_id).first()
     if not db_video:
-        return None
-    return db_video.path
+        raise HTTPException(status_code=404, detail="Видео не найдено в БД")
+    return db_video
 
-async def get_video_preview(db: Session, video_id: int, user_id: int):
-    try:
-        db_video = db.query(Videos).filter(Videos.id == video_id, Videos.user_id == user_id).first()
-        if not db_video:
-            return None
-        return db_video.preview_url
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка при запросе к базе данных: {str(e)}")

@@ -6,6 +6,7 @@ from storage_service.api.database import Base
 
 class Videos(Base):
     __tablename__ = "videos"
+    __table_args__ = {'schema': 'file_storage'}
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     name = Column(String)
